@@ -17,7 +17,7 @@ Interactive multiplication practice for facts **1×1 through 12×12**. Practice 
 
 ## How to use
 
-1. Open `multiplication-flashcards.html` in a modern browser (or visit your GitHub Pages URL).  
+1. Open `index.html` in a modern browser (or visit your GitHub Pages URL).  
 2. Optionally enable **Randomize** and/or **Double the number of cards**.  
 3. Tap a blue set button to start practicing.  
 4. Enter the product with the keypad or enable **Voice answer** and speak the number.  
@@ -27,18 +27,8 @@ Interactive multiplication practice for facts **1×1 through 12×12**. Practice 
 
 | File | Description |
 |------|-------------|
-| `multiplication-flashcards.html` | Full app (React via CDN + Babel). Single file, no build step. |
+| `index.html` | Full app (React via CDN + Babel). Single file, no build step. |
 | `README.md` | This file |
-
-You can rename `multiplication-flashcards.html` to `index.html` so the repo root opens the app on GitHub Pages.
-
-## Deploy on GitHub Pages
-
-1. Create a new repository.  
-2. Add `multiplication-flashcards.html` (optionally as `index.html`) and this `README.md`.  
-3. Push to GitHub.  
-4. **Settings → Pages** → Source: Deploy from a branch → choose `main` (or `docs` folder if you prefer).  
-5. Open the site URL, e.g. `https://YOUR_USERNAME.github.io/REPO_NAME/`.  
 
 No Node, npm, or backend required. The site must be served over **HTTPS** for microphone access (GitHub Pages provides HTTPS).
 
