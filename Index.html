@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multiplication Flash Cards</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --correct: #22c55e;
+      --wrong: #ef4444;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 16px;
+    }
+    #root { width: 100%; max-width: 720px; }
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+    .section {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+    .progress-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 10px;
+    }
+    .progress-btn {
+      position: relative;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1rem;
+      color: white;
+      transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-height: 64px;
+    }
+    .progress-btn:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+    .progress-btn:active { transform: translateY(0); }
+    .progress-btn.active {
+      box-shadow: 0 0 0 3px white, 0 0 0 6px currentColor;
+    }
+    .pct-box {
+      width: 100%;
+      margin-top: 2px;
+      padding: 4px 6px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.35);
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: rgba(255, 255, 255, 0.95);
+      position: relative;
+      overflow: hidden;
+    }
+    .pct-box-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 8px;
+      transition: width 0.3s ease;
+      pointer-events: none;
+    }
+    .pct-box-text {
+      position: relative;
+      z-index: 1;
+    }
+    .group-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .group-btn {
+      flex: 1;
+      min-width: 100px;
+    }
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .check-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      user-select: none;
+    }
+    .check-label input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    /* Flash card view */
+    .card-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .card {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      border: 2px solid var(--border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 360px;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      position: relative;
+    }
+    .problem {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .answer-display {
+      font-size: 2.2rem;
+      font-weight: 600;
+      min-height: 48px;
+      color: var(--accent);
+      letter-spacing: 0.05em;
+    }
+    .answer-display.correct { color: var(--correct); }
+    .answer-display.wrong { color: var(--wrong); }
+    .feedback {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .feedback.ok { background: rgba(34,197,94,0.2); color: var(--correct); }
+    .feedback.bad { background: rgba(239,68,68,0.2); color: var(--wrong); }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 360px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
+    }
+    .key {
+      border: none;
+      border-radius: 14px;
+      background: #334155;
+      color: white;
+      font-size: 1.4rem;
+      font-weight: 600;
+      padding: 16px 0;
+      cursor: pointer;
+      transition: background 0.12s, transform 0.1s;
+    }
+    .key:hover { background: #475569; }
+    .key:active { transform: scale(0.96); }
+    .key.enter {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .key.enter:hover { filter: brightness(1.1); }
+    .key.del {
+      background: #64748b;
+    }
+    .key.del:hover { background: #94a3b8; color: #0f172a; }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn:active { transform: scale(0.97); }
+    .btn-secondary {
+      background: #334155;
+      color: white;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0f172a;
+    }
+    .btn-danger {
+      background: #7f1d1d;
+      color: #fecaca;
+    }
+    .btn-mic {
+      background: #334155;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-mic.listening {
+      background: #dc2626;
+      animation: pulse-mic 1.2s ease-in-out infinite;
+    }
+    .btn-mic.unsupported {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    @keyframes pulse-mic {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.5); }
+      50% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+    }
+    .voice-hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .voice-hint.active { color: #fca5a5; }
+    .stats {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .stats strong { color: var(--text); }
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+    }
+    .results {
+      text-align: center;
+      padding: 24px;
+    }
+    .results h2 { margin-bottom: 12px; }
+    .results p { color: var(--muted); margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
+
+    // Button colors: lighter blue by default, green when completed (≥90%)
+    const BTN_BLUE = '#1e3a5f';   // shade lighter / bluer than page background
+    const BTN_GREEN = '#16a34a';  // completed
+
+    function getProgressColor(pct) {
+      if (pct >= 90) return BTN_GREEN;
+      if (pct >= 70) return '#84cc16';
+      if (pct >= 50) return '#eab308';
+      if (pct >= 30) return '#f97316';
+      return '#ef4444';
+    }
+
+    function buttonColorForPct(pct) {
+      return pct >= 90 ? BTN_GREEN : BTN_BLUE;
+    }
+
+    function buildDeck(multipliers, doubleCards, randomize) {
+      let cards = [];
+      multipliers.forEach(m => {
+        for (let n = 1; n <= 12; n++) {
+          cards.push({ a: m, b: n, answer: m * n });
+        }
+      });
+      if (doubleCards) {
+        cards = [...cards, ...cards];
+      }
+      if (randomize) {
+        for (let i = cards.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [cards[i], cards[j]] = [cards[j], cards[i]];
+        }
+      }
+      return cards;
+    }
+
+    function ProgressButton({ label, pct, active, onClick, className = '' }) {
+      const bg = buttonColorForPct(pct);
+      const completed = pct >= 90;
+      return (
+        <button
+          className={`progress-btn ${className} ${active ? 'active' : ''} ${completed ? 'completed' : ''}`}
+          style={{ background: bg, color: 'white' }}
+          onClick={onClick}
+        >
+          <span>{label}{completed ? ' ✓' : ''}</span>
+          <div className="pct-box">
+            <div className="pct-box-fill" style={{ width: `${pct}%` }} />
+            <span className="pct-box-text">{pct}%</span>
+          </div>
+        </button>
+      );
+    }
+
+    function Keypad({ onDigit, onDelete, onEnter, disabled }) {
+      const keys = ['1','2','3','4','5','6','7','8','9'];
+      return (
+        <div className="keypad">
+          {keys.map(k => (
+            <button key={k} className="key" onClick={() => onDigit(k)} disabled={disabled}>{k}</button>
+          ))}
+          <button className="key del" onClick={onDelete} disabled={disabled}>⌫</button>
+          <button className="key" onClick={() => onDigit('0')} disabled={disabled}>0</button>
+          <button className="key enter" onClick={onEnter} disabled={disabled}>Enter</button>
+        </div>
+      );
+    }
+
+    // Parse spoken English numbers into digits (supports 0–999 and digit strings)
+    function parseSpokenNumber(transcript) {
+      if (!transcript) return null;
+      const t = transcript.toLowerCase().trim()
+        .replace(/-/g, ' ')
+        .replace(/\s+/g, ' ');
+
+      // Direct digits: "36", "1 2", "one two" mixed
+      const digitOnly = t.replace(/[^\d]/g, '');
+      if (digitOnly.length > 0 && digitOnly.length <= 4 && /^\d+$/.test(digitOnly) && !/[a-z]/.test(t.replace(/\s/g, ''))) {
+        return digitOnly;
+      }
+
+      const ones = {
+        zero: 0, oh: 0, o: 0, nought: 0,
+        one: 1, two: 2, three: 3, four: 4, five: 5,
+        six: 6, seven: 7, eight: 8, nine: 9,
+        ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
+        fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19
+      };
+      const tens = {
+        twenty: 20, thirty: 30, forty: 40, fifty: 50,
+        sixty: 60, seventy: 70, eighty: 80, ninety: 90
+      };
+
+      // Try full phrase as a single number
+      const words = t.split(' ').filter(Boolean);
+      let total = 0;
+      let current = 0;
+      let found = false;
+
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        if (ones[w] !== undefined) {
+          current += ones[w];
+          found = true;
+        } else if (tens[w] !== undefined) {
+          current += tens[w];
+          found = true;
+        } else if (w === 'hundred') {
+          current = (current || 1) * 100;
+          found = true;
+        } else if (w === 'and') {
+          continue;
+        } else if (/^\d+$/.test(w)) {
+          current += parseInt(w, 10);
+          found = true;
+        }
+      }
+      total += current;
+
+      if (found && total >= 0 && total <= 9999) {
+        return String(total);
+      }
+
+      // Fallback: extract first number-like token sequence of digits
+      const m = t.match(/\d{1,4}/);
+      if (m) return m[0];
+
+      return null;
+    }
+
+    function getSpeechRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      return SR ? new SR() : null;
+    }
+
+    function emptyProgress() {
+      const p = {};
+      for (let i = 1; i <= 12; i++) p[i] = { correct: 0, total: 0 };
+      return p;
+    }
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem('multFlashProgress');
+        if (!raw) return emptyProgress();
+        const parsed = JSON.parse(raw);
+        const p = emptyProgress();
+        for (let i = 1; i <= 12; i++) {
+          if (parsed[i] && typeof parsed[i].correct === 'number' && typeof parsed[i].total === 'number') {
+            p[i] = { correct: parsed[i].correct, total: parsed[i].total };
+          }
+        }
+        return p;
+      } catch (e) {
+        return emptyProgress();
+      }
+    }
+
+    function App() {
+      // progress[multi] = { correct, total } per multiplier (1-12)
+      const [progress, setProgress] = useState(loadProgress);
+
+      // Persist progress whenever it changes
+      useEffect(() => {
+        try {
+          localStorage.setItem('multFlashProgress', JSON.stringify(progress));
+        } catch (e) { /* ignore quota / private mode */ }
+      }, [progress]);
+
+      const [randomize, setRandomize] = useState(true);
+      const [doubleCards, setDoubleCards] = useState(false);
+
+      const [mode, setMode] = useState('home'); // home | practice | results
+      const [deck, setDeck] = useState([]);
+      const [index, setIndex] = useState(0);
+      const [input, setInput] = useState('');
+      const [feedback, setFeedback] = useState(null); // null | 'correct' | 'wrong'
+      const [sessionCorrect, setSessionCorrect] = useState(0);
+      const [sessionTotal, setSessionTotal] = useState(0);
+      const [activeLabel, setActiveLabel] = useState('');
+      const [locked, setLocked] = useState(false);
+
+      // Auto-start a short demo set when ?demo=1 is in the URL (for testing)
+      useEffect(() => {
+        if (window.location.search.includes('demo=1') && mode === 'home' && deck.length === 0) {
+          const d = buildDeck([3], false, true);
+          setDeck(d);
+          setIndex(0);
+          setActiveLabel('×3 (demo)');
+          setMode('practice');
+        }
+      }, []);
+
+      const calcPct = (obj) => {
+        if (!obj || obj.total === 0) return 0;
+        return Math.round((obj.correct / obj.total) * 100);
+      };
+
+      const individualPct = (n) => calcPct(progress[n]);
+
+      const groupPct = (nums) => {
+        let c = 0, t = 0;
+        nums.forEach(n => {
+          c += progress[n].correct;
+          t += progress[n].total;
+        });
+        return t === 0 ? 0 : Math.round((c / t) * 100);
+      };
+
+      const startPractice = (multipliers, label) => {
+        const d = buildDeck(multipliers, doubleCards, randomize);
+        setDeck(d);
+        setIndex(0);
+        setInput('');
+        setFeedback(null);
+        setSessionCorrect(0);
+        setSessionTotal(0);
+        setActiveLabel(label);
+        setLocked(false);
+        setMode('practice');
+      };
+
+      const [resetFlash, setResetFlash] = useState(false);
+
+      const resetAllProgress = () => {
+        const p = emptyProgress();
+        setProgress(p);
+        try {
+          localStorage.removeItem('multFlashProgress');
+          localStorage.setItem('multFlashProgress', JSON.stringify(p));
+        } catch (e) { /* ignore */ }
+        setResetFlash(true);
+        setTimeout(() => setResetFlash(false), 1500);
+      };
+
+      const current = deck[index];
+
+      const [voiceEnabled, setVoiceEnabled] = useState(false);
+      const [listening, setListening] = useState(false);
+      const [voiceHint, setVoiceHint] = useState('');
+      const [speechSupported] = useState(() => !!(window.SpeechRecognition || window.webkitSpeechRecognition));
+      const recognitionRef = React.useRef(null);
+      const inputRef = React.useRef(input);
+      const lockedRef = React.useRef(locked);
+      const currentRef = React.useRef(current);
+
+      useEffect(() => { inputRef.current = input; }, [input]);
+      useEffect(() => { lockedRef.current = locked; }, [locked]);
+      useEffect(() => { currentRef.current = current; }, [current]);
+
+      const submitAnswer = useCallback((overrideValue) => {
+        const value = overrideValue !== undefined ? String(overrideValue) : inputRef.current;
+        if (!currentRef.current || lockedRef.current || value === '') return;
+        setLocked(true);
+        if (overrideValue !== undefined) setInput(String(overrideValue));
+        const num = parseInt(value, 10);
+        const isCorrect = num === currentRef.current.answer;
+        setFeedback(isCorrect ? 'correct' : 'wrong');
+        setSessionTotal(t => t + 1);
+        if (isCorrect) setSessionCorrect(c => c + 1);
+
+        // Update progress for the multiplier being practiced (the 'a' side)
+        setProgress(prev => {
+          const next = { ...prev };
+          const m = currentRef.current.a;
+          next[m] = {
+            correct: prev[m].correct + (isCorrect ? 1 : 0),
+            total: prev[m].total + 1,
+          };
+          return next;
+        });
+
+        setTimeout(() => {
+          setInput('');
+          setFeedback(null);
+          setLocked(false);
+          if (index + 1 >= deck.length) {
+            setMode('results');
+          } else {
+            setIndex(i => i + 1);
+          }
+        }, isCorrect ? 600 : 1100);
+      }, [index, deck.length]);
+
+      const handleDigit = (d) => {
+        if (locked) return;
+        setInput(prev => {
+          if (prev.length >= 4) return prev;
+          return prev + d;
+        });
+      };
+
+      const handleDelete = () => {
+        if (locked) return;
+        setInput(prev => prev.slice(0, -1));
+      };
+
+      // Keyboard support
+      useEffect(() => {
+        if (mode !== 'practice') return;
+        const onKey = (e) => {
+          if (e.key >= '0' && e.key <= '9') handleDigit(e.key);
+          else if (e.key === 'Backspace') handleDelete();
+          else if (e.key === 'Enter') submitAnswer();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [mode, submitAnswer, locked, input]);
+
+      // Speech recognition: continuous listen while voiceEnabled in practice mode
+      useEffect(() => {
+        if (mode !== 'practice' || !voiceEnabled || !speechSupported) {
+          if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch (e) {}
+            recognitionRef.current = null;
+          }
+          setListening(false);
+          return;
+        }
+
+        const rec = getSpeechRecognition();
+        if (!rec) {
+          setVoiceHint('Speech not supported in this browser');
+          setVoiceEnabled(false);
+          return;
+        }
+
+        rec.lang = 'en-US';
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.maxAlternatives = 3;
+
+        rec.onstart = () => {
+          setListening(true);
+          setVoiceHint('Listening… say the answer');
+        };
+
+        rec.onend = () => {
+          setListening(false);
+          // Restart if still enabled (browser stops after silence)
+          if (voiceEnabled && mode === 'practice' && recognitionRef.current === rec) {
+            try { rec.start(); } catch (e) {}
+          }
+        };
+
+        rec.onerror = (ev) => {
+          if (ev.error === 'not-allowed') {
+            setVoiceHint('Microphone blocked — allow mic access in browser settings');
+            setVoiceEnabled(false);
+            setListening(false);
+          } else if (ev.error === 'no-speech') {
+            setVoiceHint('No speech heard — try again');
+          } else if (ev.error !== 'aborted') {
+            setVoiceHint('Voice error: ' + ev.error);
+          }
+        };
+
+        rec.onresult = (event) => {
+          if (lockedRef.current) return;
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (!event.results[i].isFinal) continue;
+            const transcript = event.results[i][0].transcript;
+            const parsed = parseSpokenNumber(transcript);
+            if (parsed !== null) {
+              setVoiceHint('Heard: ' + transcript.trim() + ' → ' + parsed);
+              submitAnswer(parsed);
+              break;
+            } else {
+              setVoiceHint('Heard: "' + transcript.trim() + '" — say a number');
+            }
+          }
+        };
+
+        recognitionRef.current = rec;
+        try {
+          rec.start();
+        } catch (e) {
+          setVoiceHint('Could not start microphone');
+          setVoiceEnabled(false);
+        }
+
+        return () => {
+          recognitionRef.current = null;
+          try { rec.stop(); } catch (e) {}
+        };
+      }, [mode, voiceEnabled, speechSupported, submitAnswer]);
+
+      // Stop voice when leaving practice
+      useEffect(() => {
+        if (mode !== 'practice' && voiceEnabled) {
+          setVoiceEnabled(false);
+          setVoiceHint('');
+        }
+      }, [mode]);
+
+      const toggleVoice = () => {
+        if (!speechSupported) {
+          setVoiceHint('Speech recognition needs Chrome, Edge, or Safari');
+          return;
+        }
+        setVoiceEnabled(v => !v);
+        if (voiceEnabled) setVoiceHint('');
+      };
+
+      const goHome = () => {
+        setVoiceEnabled(false);
+        setVoiceHint('');
+        setMode('home');
+        setDeck([]);
+        setIndex(0);
+        setInput('');
+        setFeedback(null);
+      };
+
+      if (mode === 'results') {
+        const pct = sessionTotal ? Math.round((sessionCorrect / sessionTotal) * 100) : 0;
+        return (
+          <div>
+            <h1>Multiplication Flash Cards</h1>
+            <div className="section results">
+              <h2>Session Complete!</h2>
+              <p><strong>{activeLabel}</strong></p>
+              <p style={{ fontSize: '1.5rem', color: 'var(--text)', margin: '16px 0' }}>
+                {sessionCorrect} / {sessionTotal} correct
+              </p>
+              <p style={{ fontSize: '1.25rem', color: getProgressColor(pct) }}>{pct}%</p>
+              <div className="controls" style={{ marginTop: 24 }}>
+                <button className="btn btn-secondary" onClick={goHome}>Back to Menu</button>
+                <button className="btn btn-primary" onClick={() => startPractice(
+                  activeLabel === 'All (1-12)' ? [1,2,3,4,5,6,7,8,9,10,11,12] :
+                  activeLabel === '2-5' ? [2,3,4,5] :
+                  activeLabel === '6-8' ? [6,7,8] :
+                  activeLabel === '9-12' ? [9,10,11,12] :
+                  [parseInt(activeLabel.replace('×',''), 10)],
+                  activeLabel
+                )}>Practice Again</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (mode === 'practice' && current) {
+        return (
+          <div>
+            <h1>Multiplication Flash Cards</h1>
+            <p className="subtitle">{activeLabel} · Card {index + 1} of {deck.length}</p>
+            <div className="card-view">
+              <div className="meta">
+                <span>Correct: <strong>{sessionCorrect}</strong></span>
+                <span>Remaining: <strong>{deck.length - index}</strong></span>
+              </div>
+              <div className="card">
+                {feedback && (
+                  <span className={`feedback ${feedback === 'correct' ? 'ok' : 'bad'}`}>
+                    {feedback === 'correct' ? '✓ Correct!' : `✗ ${current.answer}`}
+                  </span>
+                )}
+                <div className="problem">{current.a} × {current.b}</div>
+                <div className={`answer-display ${feedback || ''}`}>
+                  {input || <span style={{ opacity: 0.3 }}>?</span>}
+                </div>
+              </div>
+              <Keypad
+                onDigit={handleDigit}
+                onDelete={handleDelete}
+                onEnter={() => submitAnswer()}
+                disabled={locked}
+              />
+              <p className={`voice-hint ${listening ? 'active' : ''}`}>
+                {voiceHint || (voiceEnabled ? 'Listening… say the answer' : '')}
+              </p>
+              <div className="controls">
+                <button
+                  type="button"
+                  className={`btn btn-mic ${listening ? 'listening' : ''} ${!speechSupported ? 'unsupported' : ''}`}
+                  onClick={toggleVoice}
+                  title={speechSupported ? (voiceEnabled ? 'Turn off voice answers' : 'Answer by speaking') : 'Speech not supported in this browser'}
+                >
+                  {listening ? '🔴 Listening' : voiceEnabled ? '🎤 Voice on' : '🎤 Voice answer'}
+                </button>
+                <button className="btn btn-secondary" onClick={goHome}>Quit</button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Home view
+      return (
+        <div>
+          <h1>Multiplication Flash Cards</h1>
+          <p className="subtitle">Choose a set · Track your progress · Keypad or voice answers</p>
+
+          <div className="section">
+            <div className="section-title">Individual (1–12)</div>
+            <div className="progress-grid">
+              {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                <ProgressButton
+                  key={n}
+                  label={`×${n}`}
+                  pct={individualPct(n)}
+                  onClick={() => startPractice([n], `×${n}`)}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="section">
+            <div className="section-title">Groups</div>
+            <div className="group-row">
+              <ProgressButton
+                className="group-btn"
+                label="2–5"
+                pct={groupPct([2,3,4,5])}
+                onClick={() => startPractice([2,3,4,5], '2-5')}
+              />
+              <ProgressButton
+                className="group-btn"
+                label="6–8"
+                pct={groupPct([6,7,8])}
+                onClick={() => startPractice([6,7,8], '6-8')}
+              />
+              <ProgressButton
+                className="group-btn"
+                label="9–12"
+                pct={groupPct([9,10,11,12])}
+                onClick={() => startPractice([9,10,11,12], '9-12')}
+              />
+              <ProgressButton
+                className="group-btn"
+                label="All"
+                pct={groupPct([1,2,3,4,5,6,7,8,9,10,11,12])}
+                onClick={() => startPractice([1,2,3,4,5,6,7,8,9,10,11,12], 'All (1-12)')}
+              />
+            </div>
+          </div>
+
+          <div className="section">
+            <div className="section-title">Options</div>
+            <div className="options">
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={randomize}
+                  onChange={e => setRandomize(e.target.checked)}
+                />
+                Randomize flash cards
+              </label>
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  checked={doubleCards}
+                  onChange={e => setDoubleCards(e.target.checked)}
+                />
+                Double the number of cards
+              </label>
+              <button
+                className="btn btn-danger"
+                onClick={resetAllProgress}
+                type="button"
+                style={resetFlash ? { background: '#22c55e', color: '#0f172a' } : undefined}
+              >
+                {resetFlash ? 'Progress reset!' : 'Reset all progress'}
+              </button>
+            </div>
+          </div>
+
+          <div className="section" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
+            Progress is tracked per multiplier as you answer. Select any colored button above to start practicing that set.
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
