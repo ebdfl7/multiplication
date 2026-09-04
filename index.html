@@ -444,23 +444,30 @@
       return SR ? new SR() : null;
     }
 
+    // Each set is tracked independently: "1"…"12", "2-5", "6-8", "9-12", "all"
+    const PROGRESS_KEYS = [
+      '1','2','3','4','5','6','7','8','9','10','11','12',
+      '2-5','6-8','9-12','all'
+    ];
+    const STORAGE_KEY = 'multFlashProgress_v2';
+
     function emptyProgress() {
       const p = {};
-      for (let i = 1; i <= 12; i++) p[i] = { correct: 0, total: 0 };
+      PROGRESS_KEYS.forEach(k => { p[k] = { correct: 0, total: 0 }; });
       return p;
     }
 
     function loadProgress() {
       try {
-        const raw = localStorage.getItem('multFlashProgress');
+        const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return emptyProgress();
         const parsed = JSON.parse(raw);
         const p = emptyProgress();
-        for (let i = 1; i <= 12; i++) {
-          if (parsed[i] && typeof parsed[i].correct === 'number' && typeof parsed[i].total === 'number') {
-            p[i] = { correct: parsed[i].correct, total: parsed[i].total };
+        PROGRESS_KEYS.forEach(k => {
+          if (parsed[k] && typeof parsed[k].correct === 'number' && typeof parsed[k].total === 'number') {
+            p[k] = { correct: parsed[k].correct, total: parsed[k].total };
           }
-        }
+        });
         return p;
       } catch (e) {
         return emptyProgress();
@@ -468,13 +475,13 @@
     }
 
     function App() {
-      // progress[multi] = { correct, total } per multiplier (1-12)
+      // progress[setKey] = { correct, total } — individuals and groups tracked separately
       const [progress, setProgress] = useState(loadProgress);
 
       // Persist progress whenever it changes
       useEffect(() => {
         try {
-          localStorage.setItem('multFlashProgress', JSON.stringify(progress));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
         } catch (e) { /* ignore quota / private mode */ }
       }, [progress]);
 
@@ -489,6 +496,7 @@
       const [sessionCorrect, setSessionCorrect] = useState(0);
       const [sessionTotal, setSessionTotal] = useState(0);
       const [activeLabel, setActiveLabel] = useState('');
+      const [activeProgressKey, setActiveProgressKey] = useState(null);
       const [locked, setLocked] = useState(false);
 
       // Auto-start a short demo set when ?demo=1 is in the URL (for testing)
@@ -498,6 +506,7 @@
           setDeck(d);
           setIndex(0);
           setActiveLabel('×3 (demo)');
+          setActiveProgressKey('3');
           setMode('practice');
         }
       }, []);
@@ -507,18 +516,9 @@
         return Math.round((obj.correct / obj.total) * 100);
       };
 
-      const individualPct = (n) => calcPct(progress[n]);
+      const setPct = (key) => calcPct(progress[key]);
 
-      const groupPct = (nums) => {
-        let c = 0, t = 0;
-        nums.forEach(n => {
-          c += progress[n].correct;
-          t += progress[n].total;
-        });
-        return t === 0 ? 0 : Math.round((c / t) * 100);
-      };
-
-      const startPractice = (multipliers, label) => {
+      const startPractice = (multipliers, label, progressKey) => {
         const d = buildDeck(multipliers, doubleCards, randomize);
         setDeck(d);
         setIndex(0);
@@ -527,6 +527,7 @@
         setSessionCorrect(0);
         setSessionTotal(0);
         setActiveLabel(label);
+        setActiveProgressKey(progressKey);
         setLocked(false);
         setMode('practice');
       };
@@ -537,8 +538,9 @@
         const p = emptyProgress();
         setProgress(p);
         try {
-          localStorage.removeItem('multFlashProgress');
-          localStorage.setItem('multFlashProgress', JSON.stringify(p));
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem('multFlashProgress'); // clear old shared format
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
         } catch (e) { /* ignore */ }
         setResetFlash(true);
         setTimeout(() => setResetFlash(false), 1500);
@@ -554,10 +556,12 @@
       const inputRef = React.useRef(input);
       const lockedRef = React.useRef(locked);
       const currentRef = React.useRef(current);
+      const progressKeyRef = React.useRef(activeProgressKey);
 
       useEffect(() => { inputRef.current = input; }, [input]);
       useEffect(() => { lockedRef.current = locked; }, [locked]);
       useEffect(() => { currentRef.current = current; }, [current]);
+      useEffect(() => { progressKeyRef.current = activeProgressKey; }, [activeProgressKey]);
 
       const submitAnswer = useCallback((overrideValue) => {
         const value = overrideValue !== undefined ? String(overrideValue) : inputRef.current;
@@ -568,17 +572,18 @@
         const isCorrect = num === currentRef.current.answer;
         setFeedback(isCorrect ? 'correct' : 'wrong');
         setSessionTotal(t => t + 1);
-        if (isCorrect) setSessionCorrect(c => c + 1);
 
-        // Update progress for the multiplier being practiced (the 'a' side)
-        setProgress(prev => {
-          const next = { ...prev };
-          const m = currentRef.current.a;
-          next[m] = {
-            correct: prev[m].correct + (isCorrect ? 1 : 0),
-            total: prev[m].total + 1,
-          };
-          return next;
+        // % = correct this run / number of questions in the set
+        const key = progressKeyRef.current;
+        setSessionCorrect(c => {
+          const newCorrect = c + (isCorrect ? 1 : 0);
+          if (key) {
+            setProgress(prev => ({
+              ...prev,
+              [key]: { correct: newCorrect, total: deck.length },
+            }));
+          }
+          return newCorrect;
         });
 
         setTimeout(() => {
@@ -721,6 +726,7 @@
         setIndex(0);
         setInput('');
         setFeedback(null);
+        setActiveProgressKey(null);
       };
 
       if (mode === 'results') {
@@ -737,14 +743,16 @@
               <p style={{ fontSize: '1.25rem', color: getProgressColor(pct) }}>{pct}%</p>
               <div className="controls" style={{ marginTop: 24 }}>
                 <button className="btn btn-secondary" onClick={goHome}>Back to Menu</button>
-                <button className="btn btn-primary" onClick={() => startPractice(
-                  activeLabel === 'All (1-12)' ? [1,2,3,4,5,6,7,8,9,10,11,12] :
-                  activeLabel === '2-5' ? [2,3,4,5] :
-                  activeLabel === '6-8' ? [6,7,8] :
-                  activeLabel === '9-12' ? [9,10,11,12] :
-                  [parseInt(activeLabel.replace('×',''), 10)],
-                  activeLabel
-                )}>Practice Again</button>
+                <button className="btn btn-primary" onClick={() => {
+                  const key = activeProgressKey;
+                  const multipliers =
+                    key === 'all' ? [1,2,3,4,5,6,7,8,9,10,11,12] :
+                    key === '2-5' ? [2,3,4,5] :
+                    key === '6-8' ? [6,7,8] :
+                    key === '9-12' ? [9,10,11,12] :
+                    [parseInt(key, 10)];
+                  startPractice(multipliers, activeLabel, key);
+                }}>Practice Again</button>
               </div>
             </div>
           </div>
@@ -810,8 +818,8 @@
                 <ProgressButton
                   key={n}
                   label={`×${n}`}
-                  pct={individualPct(n)}
-                  onClick={() => startPractice([n], `×${n}`)}
+                  pct={setPct(String(n))}
+                  onClick={() => startPractice([n], `×${n}`, String(n))}
                 />
               ))}
             </div>
@@ -823,26 +831,26 @@
               <ProgressButton
                 className="group-btn"
                 label="2–5"
-                pct={groupPct([2,3,4,5])}
-                onClick={() => startPractice([2,3,4,5], '2-5')}
+                pct={setPct('2-5')}
+                onClick={() => startPractice([2,3,4,5], '2-5', '2-5')}
               />
               <ProgressButton
                 className="group-btn"
                 label="6–8"
-                pct={groupPct([6,7,8])}
-                onClick={() => startPractice([6,7,8], '6-8')}
+                pct={setPct('6-8')}
+                onClick={() => startPractice([6,7,8], '6-8', '6-8')}
               />
               <ProgressButton
                 className="group-btn"
                 label="9–12"
-                pct={groupPct([9,10,11,12])}
-                onClick={() => startPractice([9,10,11,12], '9-12')}
+                pct={setPct('9-12')}
+                onClick={() => startPractice([9,10,11,12], '9-12', '9-12')}
               />
               <ProgressButton
                 className="group-btn"
                 label="All"
-                pct={groupPct([1,2,3,4,5,6,7,8,9,10,11,12])}
-                onClick={() => startPractice([1,2,3,4,5,6,7,8,9,10,11,12], 'All (1-12)')}
+                pct={setPct('all')}
+                onClick={() => startPractice([1,2,3,4,5,6,7,8,9,10,11,12], 'All (1-12)', 'all')}
               />
             </div>
           </div>
@@ -878,7 +886,7 @@
           </div>
 
           <div className="section" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
-            Progress is tracked per multiplier as you answer. Select any colored button above to start practicing that set.
+            Each set (individual, group, or All) tracks its own progress separately. Select a button above to practice that set.
           </div>
         </div>
       );
